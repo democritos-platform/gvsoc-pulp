@@ -19,4 +19,7 @@ add_subdirectory(datamover)
 add_subdirectory(spatz)
 add_subdirectory(snitch)
 add_subdirectory(redmule)
+
+add_subdirectory(pcm)
+add_subdirectory(dimc)
 add_subdirectory(pcie_vfio_bridge)
