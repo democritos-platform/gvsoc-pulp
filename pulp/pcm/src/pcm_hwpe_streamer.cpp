@@ -2,6 +2,17 @@
 
 #define BYTES_PER_BANK 4
 
+// PCM's `stream_mst` master port binds directly onto the L1 interleaver's
+// input port (l1_subsystem.py's `pcm_in`), bypassing the per-PE reloc-
+// mapping router (pe_icos[i] in l1_subsystem.py) that strips a PI_L1
+// pointer's cluster base off for other masters: every set_addr() on
+// `stream_mst` must already be a cluster-local (0-based) offset.
+namespace PcmAddr
+{
+	// TODO: MAKE THIS MASK CONFIGURABLE FROM OUTSIDE
+    constexpr uint32_t CLUSTER_WINDOW_MASK = 0x400000 - 1; // cluster L1 window size (cluster.json)
+}
+
 Pcm_HWPE_Streamer::Pcm_HWPE_Streamer(Pcm_HWPE* pcm, bool is_write) {
     this->pcm = pcm;
 	
@@ -48,6 +59,10 @@ void Pcm_HWPE_Streamer::configure(
 	this->d2_stride = d2_stride	;
 	this->d3_stride	= d3_stride	;
     this->pos       = 0			;
+	this->tot_iters = 0			;
+	this->d0_iters  = 0			;
+	this->d1_iters  = 0			;
+	this->d2_iters  = 0			;
 
 	this->pcm->trace.msg("base addr %x\ntot len %d\nd0 len %d\nd0 stride %d\nd1 len %d\nd1 stride %d\nd2 stride %d\nd3 stride %d\n",
 		this->base_addr	,
@@ -74,7 +89,7 @@ bool Pcm_HWPE_Streamer::is_done() {
 }
 
 int Pcm_HWPE_Streamer::rw_data(int width, void* buf, strobe_t strb) {
-	uint32_t offs = (this->base_addr + this->pos);
+	uint32_t offs = (this->base_addr + this->pos) & PcmAddr::CLUSTER_WINDOW_MASK;
 	int64_t latency = 0;
 	int64_t max_latency = 0;
 
